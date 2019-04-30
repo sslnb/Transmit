@@ -1,0 +1,11 @@
+2019-04-12 15:53:11  [ main:1 ] - [ DEBUG ]  no sigar-x86-winnt.dll in java.library.path
+org.hyperic.sigar.SigarException: no sigar-x86-winnt.dll in java.library.path
+	at org.hyperic.sigar.Sigar.loadLibrary(Sigar.java:172)
+	at org.hyperic.sigar.Sigar.<clinit>(Sigar.java:100)
+	at com.arshiner.common.SystemInfo.<clinit>(SystemInfo.java:34)
+	at com.arshiner.OpenWy.run(OpenWy.java:47)
+	at org.springframework.boot.SpringApplication.callRunner(SpringApplication.java:797)
+	at org.springframework.boot.SpringApplication.callRunners(SpringApplication.java:781)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:335)
+	at com.arshiner.Application.main(Application.java:29)
+2019-04-12 15:53:35  [ main:0 ] - [ DEBUG ]  启动浏览器打开项目成功true

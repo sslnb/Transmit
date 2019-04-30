@@ -1,0 +1,13 @@
+[{
+    "newsId" : "1",
+    "newsName" : "css3用transition实现边框动画效果",
+    "newsAuthor" : "请叫我马哥",
+    "newsLook" : "Super管理",
+    "newsTime" : "2017-04-14"
+},{
+    "newsId" : "2",
+    "newsName" : "自定义的模块名称可以包含/吗",
+    "newsAuthor" : "请叫我马哥",
+    "newsLook" : "普通用户",
+    "newsTime" : "2017-04-14"
+}]

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml"xmlns:th="http://www.thymeleaf.org">
+
+<head>
+<meta charset="utf-8">
+<title>Agent配置</title>
+<meta name="renderer" content="webkit">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta name="viewport"
+	content="width=device-width, initial-scale=1, maximum-scale=1">
+<link rel="stylesheet" href="../../static/layui/css/layui.css"
+	media="all" />
+</head>
+<body>
+<form>
+    <div id="div">
+    	<input type="text" id ="index"  > <input value="设置数据库个数" type="button" onclick="setindex()">
+        <input type="button"  value="添加配置" onclick="addText()"/>
+    </div>
+</form>
+
+</body>
+
+<script type="text/javascript">
+var index = 0;
+function setindex() {
+	index = document.getElementById("index").value;
+	alert(index);
+}
+function addText() {
+	alert(index);
+	var div = document.getElementById("div");
+	for (var i = 0; i < index; i++) {
+		div.innerHTML += "<div class='login-center clearfix'>"
+				+ "	<div class='login-center-img'><img src='../static/img/name.png'/></div>"
+				+ "	<div class='login-center-input'>"
+				+ "		<input id='kip"+i+"' type='text' name='' value='' placeholder='交管系统类别' onfocus='this.placeholder=''' onblur='this.placeholder='交管系统类别''/>"
+				+ "		<div class='login-center-input-text'>所传归档的目标数据库的本级交管系统类别（注意：全称）配置 "+i+"</div>"
+				+ "	</div>"
+				+ "</div>"
+				+ "<div class='login-center clearfix'>"
+				+ "	<div class='login-center-img'><img src='../static/img/name.png'/></div>"
+				+ "	<div class='login-center-input'>"
+				+ "		<input id='filepath"+i+"' type='text' name=''value='' placeholder='所要上传的文件夹' onfocus='this.placeholder=''' onblur='this.placeholder='所要上传的文件夹''/>"
+				+ "		<div class='login-center-input-text'>所要上传的文件夹 配置 "+i+"</div>"
+				+ "	</div>"
+				+ "</div>";
+	}
+}
+</script>
+</html>

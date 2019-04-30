@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Arshiner日志采集软件Agent配置</title>
+<meta name="description"
+	content="particles.js is a lightweight JavaScript library for creating particles.">
+<meta name="author" content="Vincent Garreau" />
+<meta name="viewport"
+	content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="stylesheet" media="screen" href="../static/css/style.css">
+<link rel="stylesheet" type="text/css" href="../static/css/reset.css" />
+<link rel="stylesheet" type="text/css"
+	href="../static/layui/css/layui.css" />
+</head>
+<body>
+
+	<div id="particles-js">
+		<div class="login" id="div" style="opacity: 0.85; height: 500px;">
+			<div class="login-top" style="margin-top: 50px;">Agent配置</div>
+			<div class="login-center clearfix">
+				<div class="login-center-img">
+					<img src="../static/img/name.png" />
+				</div>
+				<div class="login-center-input">
+					<input id="fip" type="text" name="" value="" placeholder="服务端IP地址"
+						onfocus="this.placeholder=''" onblur="this.placeholder='服务端IP地址'" />
+					<div class="login-center-input-text">服务端IP地址</div>
+				</div>
+			</div>
+			<div class="login-center clearfix">
+				<div class="login-center-img">
+					<img src="../static/img/name.png" />
+				</div>
+				<div class="login-center-input">
+					<input id="orafip" type="text" name="" value="" placeholder="服务端数据库IP地址"
+						onfocus="this.placeholder=''" onblur="this.placeholder='服务端数据库IP地址'" />
+					<div class="login-center-input-text">服务端数据库IP地址</div>
+				</div>
+			</div>
+			<div class="login-center clearfix">
+				<div class="login-center-img">
+					<img src="../static/img/name.png" />
+				</div>
+				<div class="login-center-input">
+					<input id="port" type="text" name="" value="" placeholder="服务端端口号"
+						onfocus="this.placeholder=''" onblur="this.placeholder='服务端端口号'" />
+					<div class="login-center-input-text">服务端端口号</div>
+				</div>
+			</div>
+			<div class="login-center clearfix">
+				<div class="login-center-img">
+					<img src="../static/img/name.png" />
+				</div>
+				<div class="login-center-input">
+					<input id="khd" type="text" name="" value="" placeholder="客户端标识"
+						onfocus="this.placeholder=''" onblur="this.placeholder='客户端标识'" />
+					<div class="login-center-input-text">客户端标识</div>
+				</div>
+			</div>
+			<div class="login-center clearfix">
+				<div class="login-center-img">
+					<img src="../static/img/name.png" />
+				</div>
+				<div class="login-center-input">
+					<input id="index" type="text" placeholder="设置本机交管系统数据库个数"
+						onfocus="this.placeholder=''"
+						onblur="this.placeholder='设置本机交管系统数据库个数'" />
+					<div class="login-center-input-text">设置本机交管系统数据库个数</div>
+				</div>
+			</div>
+			<div onclick="modt()" class="login-button">设置本机数据库个数</div>
+		</div>
+		<div class="sk-rotating-plane"></div>
+	</div>
+
+	<!-- scripts -->
+	<script src="../static/js/particles.min.js"></script>
+	<script src="../static/js/app.js"></script>
+	<script src="../static/js/jquery-3.1.1.min.js"></script>
+	<script src="../static/layui/layui.all.js"></script>
+	<script type="text/javascript">
+		//tab层
+		$(document).ready(function() {
+			/*     alert("页面加载完成！"); 
+			 */});
+		var index = 0;
+		function modt() {
+			//页面层
+			index = document.getElementById("index").value;
+			var div = "";
+			for (var i = 0; i < index; i++) {
+				div += "<div class='login-center clearfix' style='margin-left: 50px;margin-top: 50px'>"
+						+ "	<div class='login-center-img'><img src='../static/img/name.png'/></div>"
+						+ "	<div class='login-center-input'>"
+						+ "		<input id='kip"+i+"' type='text' placeholder='本级交管系统类别配置"+i+"' />"
+						+ "		<div class='login-center-input-text'>（注意：全称）配置 "
+						+ i
+						+ "</div>"
+						+ "	</div>"
+						+ "</div>"
+						+ "<div class='login-center clearfix' style='margin-left: 50px;margin-top: 50px'>"
+						+ "	<div class='login-center-img'><img src='../static/img/name.png'/></div>"
+						+ "	<div class='login-center-input'>"
+						+ "		<input id='filepath"+i+"' type='text'  placeholder='所要上传的文件夹配置"+i+"'/>"
+						+ "		<div class='login-center-input-text'>所要上传的文件夹 配置 "
+						+ i + "</div>" + "	</div>" + "</div>";
+			}
+
+			div += "<div id='submit' onclick='submit()' class='login-button'>配置</div>";
+			layer.open({
+				type : 1,
+				skin : 'layui-layer-rim', //加上边框
+				area : [ '450px', '60%' ], //宽高
+				content : div
+			});
+		}
+		function hasClass(elem, cls) {
+			cls = cls || '';
+			if (cls.replace(/\s/g, '').length == 0)
+				return false; //当cls没有参数时，返回false
+			return new RegExp(' ' + cls + ' ').test(' ' + elem.className + ' ');
+		}
+		function addClass(ele, cls) {
+			if (!hasClass(ele, cls)) {
+				ele.className = ele.className == '' ? cls : ele.className + ' '
+						+ cls;
+			}
+		}
+
+		function removeClass(ele, cls) {
+			if (hasClass(ele, cls)) {
+				var newClass = ' ' + ele.className.replace(/[\t\r\n]/g, '')
+						+ ' ';
+				while (newClass.indexOf(' ' + cls + ' ') >= 0) {
+					newClass = newClass.replace(' ' + cls + ' ', ' ');
+				}
+				ele.className = newClass.replace(/^\s+|\s+$/g, '');
+			}
+		}
+		function submit() {
+			var jlist = new Array();
+			var mlist = new Array();
+			//var jgxtlbv = "";
+			//var asd = "";
+			//设置 value
+			for (var i = 0; i < index; i++) {
+				//jgxtlbv = $("#kip" + i).val();
+				//asd = $("#filepath" + i).val();
+				jlist.push($("#kip" + i).val());
+				mlist.push($("#filepath" + i).val());
+			}
+			
+			//获取
+			$.ajax({
+				type : "POST",
+				url : "/properties",
+				data : {
+					fip : $("#fip").val(),
+					kip : $("#khd").val(),
+					orafip : $("#orafip").val(),
+					port : $("#port").val(),
+					jlist : "jlist="+jlist,
+					mlist : "mlist="+mlist 
+				},
+				dataType : "JSON",
+				success : function success(data) {
+					layer.msg("配置成功！");
+				},
+			});
+		}
+	</script>
+</body>
+</html>
