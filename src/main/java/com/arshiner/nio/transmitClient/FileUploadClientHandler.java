@@ -11,14 +11,12 @@ public class FileUploadClientHandler extends ChannelInboundHandlerAdapter {
 	private int byteRead;
 	private long start = 0;
 	private int lastLength = 0;
-	private short count = 0;
 	public RandomAccessFile randomAccessFile;
 	private ClientDTO fileUploadFile;// 可能线程不安全
 	
 	public FileUploadClientHandler(ClientDTO ef) {
 		if (ef.getFile().exists()) {
 			if (!ef.getFile().isFile()) {
-				System.out.println("Not a file :" + ef.getFile());
 				return;
 			}
 		}
@@ -32,7 +30,6 @@ public class FileUploadClientHandler extends ChannelInboundHandlerAdapter {
 	 */
 	public void channelActive(ChannelHandlerContext ctx) throws IOException {
 		try {
-			count++;
 			// start = fileUploadFile.getStarPos();
 			start = 0l;
 			randomAccessFile = new RandomAccessFile(fileUploadFile.getFile(), "r");
@@ -45,16 +42,13 @@ public class FileUploadClientHandler extends ChannelInboundHandlerAdapter {
 			start = 0l;
 			randomAccessFile.seek(start);
 			byte[] bytes = new byte[lastLength];
-			System.out.println("----"+fileUploadFile.getFile().getName()+"--------第" + count + "次传输的字节长度----------" + bytes.length);
 			/**
 			 * 这里获取配置文件中start的位置，
 			 */
-			System.out.println("第一次传输时channelActive start的值" + start);
 			randomAccessFile.seek(start);
 			// 如果start小于文件的长度
 			if ((byteRead = randomAccessFile.read(bytes)) != -1) {
 				fileUploadFile.setEndPos(byteRead);
-				System.out.println("channelActive  byteRead值" + byteRead);
 				fileUploadFile.setBytes(bytes);
 				fileUploadFile.setStarPos(start);
 				ctx.writeAndFlush(fileUploadFile);
@@ -63,7 +57,6 @@ public class FileUploadClientHandler extends ChannelInboundHandlerAdapter {
 				} catch (InterruptedException e) {
 				}
 			} else {
-				System.out.println("文件已经读完");
 				ctx.channel().close();
 			}
 		} catch (FileNotFoundException e) {
@@ -78,28 +71,20 @@ public class FileUploadClientHandler extends ChannelInboundHandlerAdapter {
 	@Override
 	public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
 		if (msg instanceof ServerDTO) {
-			count++;
 			ServerDTO server = (ServerDTO) msg;
 			start = server.getStarPos();
 			if (start != -1) {
 				randomAccessFile.seek(start);
-				System.out.println("已传输了的字节长度----" + start);
-				System.out.println("每次读取的长度：" + byteRead);
-				System.out.println("剩余长度：" + (randomAccessFile.length() - start));
 				int a = (int) (randomAccessFile.length() - start);
 				int b = (int) (byteRead);
 				if (a < b) {
 					lastLength = a;
 				}
 				byte[] bytes = new byte[lastLength];
-				System.out.println("-------------第" + count + "次传输的字节长度----------" +server.getCurrentFilenName()+ bytes.length);
 				if ((byteRead = randomAccessFile.read(bytes)) != -1 && (randomAccessFile.length() - start) > 0) {
-					System.out.println("byte 长度：" + bytes.length);
 					fileUploadFile.setEndPos(byteRead);
-					System.out.println("byteRead的值---" + byteRead);
 					fileUploadFile.setBytes(bytes);
 					fileUploadFile.setStarPos(start);
-					System.out.println("===============byteRead:" + byteRead);
 					try {
 						ctx.writeAndFlush(fileUploadFile);
 					} catch (Exception e) {
@@ -110,9 +95,7 @@ public class FileUploadClientHandler extends ChannelInboundHandlerAdapter {
 					} catch (InterruptedException e) {
 					}
 				} else {
-					System.out.println("传输完成关闭RandomAccessFile");
 					randomAccessFile.close();
-					System.out.println("文件已经读完--------" + byteRead);
 					// 这里需要进行监控
 					randomAccessFile.close();
 					ctx.close();

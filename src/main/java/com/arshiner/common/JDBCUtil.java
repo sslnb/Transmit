@@ -717,23 +717,19 @@ public class JDBCUtil {
 		
 	}
 
-	public Map<String, String> executeQueryRedo(String sql) throws SQLException {
-		LinkedHashMap<String, String> map = new LinkedHashMap<String, String>();
+	public List<String> executeQueryRedo(String sql) throws SQLException {
+		List<String> map = new ArrayList<String>();
 		pstmt = con.prepareStatement(sql);
 		resultSet = pstmt.executeQuery();
 		ResultSetMetaData metaData = resultSet.getMetaData();
 		int cols_len = metaData.getColumnCount();
-		String cols_name = "";
-		int num = 0;
 		while (resultSet.next()) {
-			num++;
 			for (int i = 1; i <= cols_len; i++) {
-				cols_name = metaData.getColumnName(i).toLowerCase() + num;
 				String cols_value = resultSet.getString(i);
 				if (cols_value == null) {
 					cols_value = "";
 				}
-				map.put(cols_name, cols_value);
+				map.add(cols_value);
 			}
 		}
 		return map;
@@ -749,7 +745,7 @@ public class JDBCUtil {
 	 * @return
 	 * @throws SQLException
 	 */
-	public Map<String, String> executeQueryRedoGD(String sql) throws SQLException {
+	public LinkedHashMap<String, String> executeQueryRedoGD(String sql) throws SQLException {
 		LinkedHashMap<String, String> map = new LinkedHashMap<String, String>();
 		pstmt = con.prepareStatement(sql);
 		resultSet = pstmt.executeQuery();

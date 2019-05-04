@@ -23,6 +23,7 @@ import com.arshiner.common.JDBCUtil;
 import com.arshiner.common.JsonToObject;
 import com.arshiner.common.ThreadPool;
 import com.arshiner.nio.heartClient.HeartClient;
+import com.arshiner.nio.transmitServer.TransmitServer;
 
 /**
  * Agent 实现
@@ -46,6 +47,7 @@ public class StartAgent implements CommandLineRunner, Ordered {
 	@Async
 	@Override
 	public void run(String... args) {
+		new TransmitServer().start();
 		peizhi = ConfigManager.properties.get("peizhi").toString();
 		model = ConfigManager.properties.get("model").toString();
 		fip = ConfigManager.properties.getProperty("fip");
@@ -272,14 +274,14 @@ public class StartAgent implements CommandLineRunner, Ordered {
 				agent.setKip(kip);
 				agent.setRedo(map);
 				try {
-					System.out.println("        ----------4----------444runGD---------");
 					agent.runGD(jgxtlb, model);
-					System.out.println("       -----------5-----------555runREDO---------");
 					agent.runRedo(jgxtlb, model);
 				} catch (IOException e) {
+					logger.error(e);
 					e.printStackTrace();
 				} catch (SQLException e) {
 					// TODO Auto-generated catch block
+					logger.error(e);
 					e.printStackTrace();
 				}
 			}
