@@ -267,13 +267,13 @@ public class StartAgent implements CommandLineRunner, Ordered {
 			@Override
 			public void run() {
 				// 创建传输对象
-				Agent agent = new Agent();
-				agent.setStatus(true);
-				agent.setFip(fip);
-				agent.setPort(port);
-				agent.setKip(kip);
-				agent.setRedo(map);
 				try {
+					Agent agent = new Agent();
+					agent.setStatus(true);
+					agent.setFip(fip);
+					agent.setPort(port);
+					agent.setKip(kip);
+					agent.setRedo(map);
 					agent.runGD(jgxtlb, model);
 					agent.runRedo(jgxtlb, model);
 				} catch (IOException e) {

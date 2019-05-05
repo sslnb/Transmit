@@ -28,13 +28,22 @@ public class Agent {
 	private String num;// 计数点
 	private Map<String, String> map;// db信息
 	JDBCUtil jdbc;
-
+	String maxthread ="";
 	/**
 	 * 构造出一个JDBC便于连接
+	 * @throws SQLException 
 	 */
-	public Agent() {
+	public Agent() throws SQLException {
 		jdbc = new JDBCUtil("adtmgr", "adtmgr", ConfigManager.properties.getProperty("orafip"),
 				ConfigManager.properties.getProperty("oraport"), ConfigManager.properties.getProperty("sid"));
+		String thread = "select max(thread#) as  maxthread from v$log";
+		jdbc.getConnection();
+		Map<String,String>  threadmap = jdbc.executeQueryNormal(thread);
+		maxthread=threadmap.get("maxthread");
+		jdbc.closeDB();
+		if (maxthread.equals("")) {
+			maxthread="1";
+		}
 	}
 
 	/**
@@ -49,6 +58,8 @@ public class Agent {
 		try {
 			num = ConfigManager.properties.get("num").toString();
 		} catch (Exception e) {
+		}
+		if (num.equals("")) {
 			jdbc.getConnection();
 			String archivetime = "select archivetime from acs where jgxtlb='" + jgxtlb + "'";
 			Map<String, String> archivetimemap = jdbc.executeQueryNormal(archivetime);
@@ -65,54 +76,57 @@ public class Agent {
 			time = "where" + "	time > '" + num + "'";
 		}
 		LinkedHashMap<String, String> gdPath = null;
-		try {
-			db.getConnection();
-			String redo = "select time,wjm from ( select to_char(next_time,'yyyy/MM/dd hh24:mi:ss') as time, name as wjm from"
-					+ " v$archived_log a where a.name is not null order by next_time asc ) " + time;
-			gdPath = db.executeQueryRedoGD(redo);
-		} catch (SQLException e1) {
-			logger.error("查询报错" + e1);
-			e1.printStackTrace();
-		} finally {
-			db.closeDB();
-		}
-		String userdir = FilePathName.ROOT + "log" + FilePathName.FileSepeartor;
-		for (Iterator<Entry<String, String>> it = gdPath.entrySet().iterator(); it.hasNext();) {
-			Entry<String, String> entry = it.next();
-			String wjm = "";
-			if (model.equals("NORMAL")) {
-				wjm = entry.getValue();
-			} else if (model.equals("ASM")) {
-				asmToNFS(entry.getValue(), userdir);
-				wjm = userdir + entry.getValue().substring(entry.getValue().lastIndexOf(FilePathName.FileSepeartor),
-						entry.getValue().length());
-			}
-			File file = new File(wjm);
-			if (!file.exists()) {
-				continue;
-			}
-			ClientDTO filestatus = new ClientDTO();
-			filestatus.setFile_md5("log");
-			filestatus.setStarPos(0l);
-			filestatus.setFile(file);
-			filestatus.setFileClientName(file.getName());
-			filestatus.setLength(file.length());
-			filestatus.setClientLogo(jgxtlb);
-			filestatus.setFilestatus("Modified");
-			filestatus.setIp(kip);
+		for (int i = 1; i <= Integer.valueOf(maxthread); i++) {
 			try {
-				new TransmitClient().connect(new Integer(port), fip, filestatus, "Modified");
-				config.configGetAndSet("num", num);
-				num = entry.getKey();
-			} catch (Exception e) {
-				logger.info("GD等待连接-----");
+				db.getConnection();
+				String redo = "select time,wjm from ( select to_char(next_time,'yyyy/MM/dd hh24:mi:ss') as time, name as wjm from"
+						+ " v$archived_log a where a.name is not null and thread#='"+i+"' order by next_time asc )" + time;
+				gdPath = db.executeQueryRedoGD(redo);
+			} catch (SQLException e1) {
+				logger.error("查询报错" + e1);
+				e1.printStackTrace();
 			} finally {
-				if (file.exists()) {
-					file.delete();
+				db.closeDB();
+			}
+			String userdir = FilePathName.ROOT + "log" + FilePathName.FileSepeartor;
+			for (Iterator<Entry<String, String>> it = gdPath.entrySet().iterator(); it.hasNext();) {
+				Entry<String, String> entry = it.next();
+				String wjm = "";
+				if (model.equals("NORMAL")) {
+					wjm = entry.getValue();
+				} else if (model.equals("ASM")) {
+					asmToNFS(entry.getValue(), userdir);
+					wjm = userdir + entry.getValue().substring(entry.getValue().lastIndexOf(FilePathName.FileSepeartor),
+							entry.getValue().length());
+				}
+				File file = new File(wjm);
+				if (!file.exists()) {
+					continue;
+				}
+				ClientDTO filestatus = new ClientDTO();
+				filestatus.setFile_md5("log");
+				filestatus.setStarPos(0l);
+				filestatus.setFile(file);
+				filestatus.setFileClientName(file.getName());
+				filestatus.setLength(file.length());
+				filestatus.setClientLogo(jgxtlb);
+				filestatus.setFilestatus("Modified");
+				filestatus.setIp("thread"+i);
+				try {
+					new TransmitClient().connect(new Integer(port), fip, filestatus, "Modified");
+					config.configGetAndSet("num", num);
+					num = entry.getKey();
+				} catch (Exception e) {
+					logger.info("GD等待连接-----");
+				} finally {
+					if (file.exists()) {
+						file.delete();
+					}
 				}
 			}
-		}
 
+		}//for maxthread
+		
 	}
 
 	public static Map<String, String> redoStatus = new HashMap<>();
@@ -127,64 +141,65 @@ public class Agent {
 		JDBCUtil db = new JDBCUtil(map.get("USERNAME"), map.get("PASSWORD"), map.get("IP"), map.get("PORT"),
 				map.get("SID"));
 		List<String> redoPath = null;
-		try {
-			db.getConnection();
-			String redo = "select member as wjm from v$logfile";
-			redoPath = db.executeQueryRedo(redo);
-		} catch (SQLException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
-		db.closeDB();
-		String userdir = FilePathName.ROOT + "redo" + FilePathName.FileSepeartor;
-		int i = 0;
-		for (Iterator<String> it = redoPath.iterator(); it.hasNext();) {
-			i++;
-			String entry = it.next();
-			String wjm = "";
-			if (model.equals("NORMAL")) {
-				wjm = entry;
-			} else if (model.equals("ASM")) {
-				// ASM转换文件系统
-				asmToNFS(entry, userdir + entry.substring(entry.lastIndexOf(FilePathName.FileSepeartor), entry.length())
-						+ "_" + i);
-				wjm = userdir + entry.substring(entry.lastIndexOf(FilePathName.FileSepeartor), entry.length()) + "_"
-						+ i;
+		for (int i = 1; i <= Integer.valueOf(maxthread); i++) {
+			try {
+				db.getConnection();
+				String redo = "select member as wjm from v$logfile where group# in (select group# from v$log where thread# = '"+i+"')";
+				redoPath = db.executeQueryRedo(redo);
+			} catch (SQLException e1) {
+				e1.printStackTrace();
 			}
-			File file = new File(wjm);
-			if (!file.exists()) {
-				continue;
-			}
-			FileInputStream fis = new FileInputStream(wjm);
-			String new_md5 = DigestUtils.md5Hex(fis);
-			if (redoStatus.containsKey(entry)) {
-				String old_md5 = redoStatus.get(entry);
-				if (old_md5.equals(new_md5)) {
-					fis.close();
+			db.closeDB();
+			String userdir = FilePathName.ROOT + "redo" + FilePathName.FileSepeartor;
+			int i1 = 0;
+			for (Iterator<String> it = redoPath.iterator(); it.hasNext();) {
+				i1++;
+				String entry = it.next();
+				String wjm = "";
+				if (model.equals("NORMAL")) {
+					wjm = entry;
+				} else if (model.equals("ASM")) {
+					// ASM转换文件系统
+					asmToNFS(entry, userdir + entry.substring(entry.lastIndexOf(FilePathName.FileSepeartor), entry.length())
+							+ "_" + i1);
+					wjm = userdir + entry.substring(entry.lastIndexOf(FilePathName.FileSepeartor), entry.length()) + "_"
+							+ i1;
+				}
+				File file = new File(wjm);
+				if (!file.exists()) {
 					continue;
+				}
+				FileInputStream fis = new FileInputStream(wjm);
+				String new_md5 = DigestUtils.md5Hex(fis);
+				if (redoStatus.containsKey(entry)) {
+					String old_md5 = redoStatus.get(entry);
+					if (old_md5.equals(new_md5)) {
+						fis.close();
+						continue;
+					} else {
+						redoStatus.put(entry, new_md5);
+					}
 				} else {
 					redoStatus.put(entry, new_md5);
 				}
-			} else {
-				redoStatus.put(entry, new_md5);
+				fis.close();
+				fis = null;
+				ClientDTO filestatus = new ClientDTO();
+				filestatus.setFile_md5("redo");
+				filestatus.setStarPos(0l);
+				filestatus.setFile(file);
+				filestatus.setFileClientName(file.getName());
+				filestatus.setLength(file.length());
+				filestatus.setClientLogo(jgxtlb);
+				filestatus.setFilestatus("Modified");
+				filestatus.setIp("thread"+i);
+				try {
+					new TransmitClient().connect(new Integer(port), fip, filestatus, "Modified");
+				} catch (Exception e) {
+					logger.info("REDO等待连接-----");
+				}
 			}
-			fis.close();
-			fis = null;
-			ClientDTO filestatus = new ClientDTO();
-			filestatus.setFile_md5("redo");
-			filestatus.setStarPos(0l);
-			filestatus.setFile(file);
-			filestatus.setFileClientName(file.getName());
-			filestatus.setLength(file.length());
-			filestatus.setClientLogo(jgxtlb);
-			filestatus.setFilestatus("Modified");
-			filestatus.setIp(kip);
-			try {
-				new TransmitClient().connect(new Integer(port), fip, filestatus, "Modified");
-			} catch (Exception e) {
-				logger.info("REDO等待连接-----");
-			}
-		}
+		}// for maxthread
 		jdbc.getConnection();
 		String stoptime = "select stoptime from acs where jgxtlb='" + jgxtlb + "'";
 		Map<String, String> stoptimemap = jdbc.executeQueryNormal(stoptime);
