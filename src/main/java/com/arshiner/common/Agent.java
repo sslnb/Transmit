@@ -1,10 +1,12 @@
 package com.arshiner.common;
 
+import java.io.BufferedReader;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -130,7 +132,6 @@ public class Agent {
 	}
 
 	public static Map<String, String> redoStatus = new HashMap<>();
-
 	/**
 	 * redo 刷新redo
 	 * 
@@ -213,15 +214,14 @@ public class Agent {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		jdbc.getConnection();
-		String isRerun = "select rerun from acs where jgxtlb='" + jgxtlb + "'";
-		Map<String, String> isRerunmap = jdbc.executeQueryNormal(isRerun);
-		jdbc.closeDB();
-		if (isRerunmap.get("rerun").equals("1")) {
-			//重启Agent，调用脚本
-		}else if (isRerunmap.get("rerun").equals("2")) {
-			//关闭Agent，不重启
-		}
+//		jdbc.getConnection();
+//		String isRerun = "select rerun from acs where jgxtlb='" + jgxtlb + "'";
+//		Map<String, String> isRerunmap = jdbc.executeQueryNormal(isRerun);
+//		jdbc.closeDB();
+//		if (isRerunmap.get("rerun").equals("1")) {
+//			//重启Agent，调用脚本
+//			
+//		}
 	}
 
 	/**
@@ -238,13 +238,18 @@ public class Agent {
 			proc = Runtime.getRuntime().exec(cmd);
 			proc.waitFor();
 			int data = 0;
+			BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(proc.getInputStream()));
+            String line = null;
+            while ((line = bufferedReader.readLine()) != null) {
+                //System.out.println(line);
+            }
+            bufferedReader.close();
 			InputStream isInput = proc.getInputStream();
 			InputStream errInput = proc.getErrorStream();
 			while ((data = isInput.read()) != -1) {
 				System.out.print((byte) data);
 			}
 			data = 0;
-			System.out.println();
 			while ((data = errInput.read()) != -1) {
 				System.out.print((byte) data);
 			}
@@ -267,6 +272,20 @@ public class Agent {
 		}
 	}
 
+	/**
+	 * 重启
+	 * @throws IOException 
+	 */
+	public void resumAgent() throws IOException{
+		String cmd = "/bin/sh " + FilePathName.ROOT+"resum.sh";
+		Process proc = null;
+		try {
+			proc = Runtime.getRuntime().exec(cmd);
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
 	public void close(Closeable c) {
 		if (c != null) {
 			try {

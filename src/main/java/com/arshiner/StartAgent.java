@@ -47,7 +47,7 @@ public class StartAgent implements CommandLineRunner, Ordered {
 	@Async
 	@Override
 	public void run(String... args) {
-		new TransmitServer().start();
+//		new TransmitServer().start();
 		peizhi = ConfigManager.properties.get("peizhi").toString();
 		model = ConfigManager.properties.get("model").toString();
 		fip = ConfigManager.properties.getProperty("fip");
@@ -89,7 +89,7 @@ public class StartAgent implements CommandLineRunner, Ordered {
 				while (true) {
 					Map<String, Object> jm = flashpeizhi();
 					JDBCUtil jdbc = new JDBCUtil("adtmgr", "adtmgr",
-							ConfigManager.properties.getProperty("orafip"), oraport, "gzdora");
+							ConfigManager.properties.getProperty("orafip"), oraport, sid);
 					try {
 						for (Iterator<Entry<String, Object>> it = jm.entrySet().iterator(); it.hasNext();) {
 							Entry<String, Object> entry = it.next();
@@ -133,8 +133,8 @@ public class StartAgent implements CommandLineRunner, Ordered {
 	public void flashsession(Map<String, String> map, String jgxtlb) {
 		JDBCUtil db = new JDBCUtil(map.get("USERNAME"), map.get("PASSWORD"), map.get("IP"), map.get("PORT"),
 				map.get("SID"));
-		JDBCUtil jdbc = new JDBCUtil("adtmgr", "adtmgr", ConfigManager.properties.getProperty("orafip"), "1521",
-				"gzdora");
+		JDBCUtil jdbc = new JDBCUtil("adtmgr", "adtmgr", ConfigManager.properties.getProperty("orafip"), oraport,
+				sid);
 		map = null;
 		String sql = "select * from (select to_char(sample_time,'yyyy/mm/dd hh24:mi:ss') t, session_id sid, session_serial# serial, user_id as user#, program, machine"
 				+ " from dba_hist_active_sess_history where user_id>0 " + "union "
@@ -209,8 +209,8 @@ public class StartAgent implements CommandLineRunner, Ordered {
 				continue;
 			}
 			int i = 0;// 线程号
-			JDBCUtil jdbc = new JDBCUtil("adtmgr", "adtmgr", ConfigManager.properties.getProperty("orafip"), "1521",
-					"gzdora");
+			JDBCUtil jdbc = new JDBCUtil("adtmgr", "adtmgr", ConfigManager.properties.getProperty("orafip"), oraport,
+					sid);
 			try {
 				jdbc.getConnection();
 			} catch (SQLException e1) {
