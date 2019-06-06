@@ -18,8 +18,8 @@ import com.arshiner.common.SystemInfo;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 public class HeartClientHandler extends ChannelInboundHandlerAdapter {
-	ConfigManager config = ConfigManager.getInstance();
-	SimpleDateFormat format = new SimpleDateFormat("yyyyMMddhhmmss");
+	 ConfigManager config = ConfigManager.getInstance();
+	 SimpleDateFormat format = new SimpleDateFormat("yyyyMMddhhmmss");
 	@Override
 	public void channelActive(ChannelHandlerContext ctx) throws Exception {
 		// TODO Auto-generated method stub
@@ -40,6 +40,7 @@ public class HeartClientHandler extends ChannelInboundHandlerAdapter {
 			list.add(heart);
 		}
 		ctx.writeAndFlush(list);
+		ctx.close();
 	}
 	public Timestamp getTime() {
 		Date utilDate = new Date();// util.Date

@@ -5,22 +5,30 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+
+import org.apache.log4j.Logger;
+
+import com.arshiner.common.Agent;
 import com.arshiner.common.ClientDTO;
 import com.arshiner.common.ServerDTO;
 public class FileUploadClientHandler extends ChannelInboundHandlerAdapter {
+	private static final Logger logger = Logger.getLogger(Agent.class);
 	private int byteRead;
 	private long start = 0;
 	private int lastLength = 0;
-	public RandomAccessFile randomAccessFile;
+	public static RandomAccessFile randomAccessFile;
 	private ClientDTO fileUploadFile;// 可能线程不安全
+	public static boolean status=true ;
 	
-	public FileUploadClientHandler(ClientDTO ef) {
+	public FileUploadClientHandler(ClientDTO ef) throws FileNotFoundException {
+		this.fileUploadFile = ef;
 		if (ef.getFile().exists()) {
 			if (!ef.getFile().isFile()) {
+				status = false;
 				return;
 			}
+			randomAccessFile = new RandomAccessFile(fileUploadFile.getFile(), "r");
 		}
-		this.fileUploadFile = ef;
 	}
 
 	// 客户端连接成功就会出发此函数
@@ -32,7 +40,12 @@ public class FileUploadClientHandler extends ChannelInboundHandlerAdapter {
 		try {
 			// start = fileUploadFile.getStarPos();
 			start = 0l;
-			randomAccessFile = new RandomAccessFile(fileUploadFile.getFile(), "r");
+			if (!fileUploadFile.getFile().exists()) {
+				logger.error("文件不存在！！！！！ status : false");
+				status=false;
+				randomAccessFile.close();
+				ctx.close();
+			}
 			if (randomAccessFile.length() < (50*1024*1024)) {
 				lastLength = (int) randomAccessFile.length();
 			} else {
@@ -51,13 +64,17 @@ public class FileUploadClientHandler extends ChannelInboundHandlerAdapter {
 				fileUploadFile.setEndPos(byteRead);
 				fileUploadFile.setBytes(bytes);
 				fileUploadFile.setStarPos(start);
+				status=true;
 				ctx.writeAndFlush(fileUploadFile);
 				try {
 					Thread.sleep(100);
 				} catch (InterruptedException e) {
 				}
 			} else {
-				ctx.channel().close();
+				logger.info("此文件转存后文件大小为0字节-------------无法传输status :false");
+				status=false;
+				randomAccessFile.getChannel().close();
+				ctx.close();
 			}
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
@@ -86,6 +103,7 @@ public class FileUploadClientHandler extends ChannelInboundHandlerAdapter {
 					fileUploadFile.setBytes(bytes);
 					fileUploadFile.setStarPos(start);
 					try {
+						status=true;
 						ctx.writeAndFlush(fileUploadFile);
 					} catch (Exception e) {
 						e.printStackTrace();
@@ -95,15 +113,11 @@ public class FileUploadClientHandler extends ChannelInboundHandlerAdapter {
 					} catch (InterruptedException e) {
 					}
 				} else {
-					randomAccessFile.close();
 					// 这里需要进行监控
 					randomAccessFile.close();
 					ctx.close();
 				}
 			} // 如果不是对象，那么可能是有问题如果是true，则是错的将此文件重传
-		} else if ((boolean) msg) {
-			randomAccessFile.close();
-			ctx.close();
 		}
 	}
 
@@ -114,6 +128,8 @@ public class FileUploadClientHandler extends ChannelInboundHandlerAdapter {
 
 	public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
 		cause.printStackTrace();
+		logger.info("status:"+status);
+		status=false;
 		ctx.close();
 	}
 }

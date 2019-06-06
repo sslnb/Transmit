@@ -56,19 +56,19 @@ public class AgentController {
 		JSONObject Json = JsonToObject.MapconsvertToJson(jm);
 		String peizhi = JsonToObject.JSONconsvertToString(Json);
 		JDBCUtil jdbc = new JDBCUtil("adtmgr", "adtmgr", orafip, "1521", "orcl");
-		try {
-			jdbc.getConnection();
+		boolean flag = true;
+			flag = jdbc.getConnection();
 			config.configGetAndSet("peizhi", peizhi);
 			config.configGetAndSet("fip", fip);
 			config.configGetAndSet("kip", kip);
 			config.configGetAndSet("port", port);
 			config.configGetAndSet("orafip", orafip);
-			string.put("status", "配置成功");
-		} catch (SQLException e1) {
-			string.put("status", "配置失败 "+e1.getMessage());
-		} finally {
-			jdbc.closeDB();
-		}
+			if (flag) {
+				string.put("status", "配置成功");
+				jdbc.closeDB();
+			}else{
+				string.put("status", "配置失败 ");
+			}
 		return JSONObject.toJSON(string);
 	}
 

@@ -16,10 +16,13 @@ import io.netty.handler.codec.string.StringDecoder;
 import io.netty.handler.codec.string.StringEncoder;
  
 public class HeartClient {
+	public static ChannelFuture f = null;
+	public static EventLoopGroup group =null;
+	public static Bootstrap b=null;
     public  void connect(int port, String host) throws Exception {
-        EventLoopGroup group = new NioEventLoopGroup(1);
+    	group = new NioEventLoopGroup();
         try {
-            Bootstrap b = new Bootstrap();
+        	b = new Bootstrap();
             b.group(group).channel(NioSocketChannel.class).option(ChannelOption.TCP_NODELAY, true).handler(new ChannelInitializer<Channel>() {
 
                 @Override
@@ -32,13 +35,16 @@ public class HeartClient {
                 	
                 }
             });
-            ChannelFuture f = b.connect(host, port).sync();
-            if (!f.isSuccess()) {
-				return ;
-			}
+            f = b.connect(host, port).sync();
+            System.out.println("心跳客户端启动成功");
             f.channel().closeFuture().sync();
         } finally {
-            group.shutdownGracefully();
+        	if (null!=group) {
+        		group.shutdownGracefully().sync();
+        		group =null;
+        		b =null;
+        		f =null;
+			}
         }
     }
   public static void main(String[] args) throws Exception {

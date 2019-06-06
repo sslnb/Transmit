@@ -467,12 +467,42 @@ public class JDBCUtil {
 	 * 
 	 * @throws SQLException
 	 */
-	public void getConnection() throws SQLException {
+	public boolean getConnection(){
 		// 注册驱动
+		boolean flag =true;
 		registeredDriver();
 		String URL = "jdbc:oracle:thin:@" + ip + ":" + port + "/" + SID;
-		System.out.println(URL);
-		con = DriverManager.getConnection(URL, USERNAME, PASSWORD);
+		try {
+			DriverManager.setLoginTimeout(1);
+			con = DriverManager.getConnection(URL, USERNAME, PASSWORD);
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			flag =getConnection1();
+		}
+		return flag;
+	}
+	/**
+	 * 驱动注册和连接
+	 * 
+	 * @throws SQLException
+	 */
+	public boolean getConnection1(){
+		// 注册驱动
+		boolean flag =true;
+		registeredDriver();
+		String URL = "jdbc:oracle:thin:@" + ip + ":" + port + ":" + SID;
+		try {
+			
+			DriverManager.setLoginTimeout(1);
+			con = DriverManager.getConnection(URL, USERNAME, PASSWORD);
+			con.setAutoCommit(true);
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			flag =false;
+		}
+		return flag;
 	}
 
 	public static void main(String[] args) {

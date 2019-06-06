@@ -53,7 +53,7 @@ public class FileUploadServerHandler extends ChannelInboundHandlerAdapter {
 				if (ef.getFile_md5().equals("redo")) {
 					type = "redo";
 				}
-				path = file_dir + ef.getFileClientName();
+				path = file_dir +"test" +FilePathName.FileSepeartor+ef.getFileClientName();
 				File file1 = new File(path);
 				// 如果此文件存再 删除
 				if (!type.equals("redo")) {

@@ -1,12 +1,10 @@
 package com.arshiner.common;
 
-import java.io.BufferedReader;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -18,8 +16,15 @@ import java.util.Map.Entry;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.log4j.Logger;
 
+import com.arshiner.nio.transmitClient.FileUploadClientHandler;
 import com.arshiner.nio.transmitClient.TransmitClient;
 
+/**
+ * lsof -p 17228 |wc -l 服务端在客户端连接成功后异常断线 是什么情况
+ * 
+ * @author MSI-PC
+ *
+ */
 public class Agent {
 	private static final Logger logger = Logger.getLogger(Agent.class);
 	ConfigManager config = ConfigManager.getInstance();
@@ -29,24 +34,15 @@ public class Agent {
 	private String kip;
 	private String num;// 计数点
 	private Map<String, String> map;// db信息
-	JDBCUtil jdbc;
-	String maxthread ="";
+	JDBCUtil jdbc; // jdbc ora服务端的
+	JDBCUtil db;
+	String maxthread = "";
+
 	/**
 	 * 构造出一个JDBC便于连接
-	 * @throws SQLException 
+	 * 
+	 * @throws SQLException
 	 */
-	public Agent() throws SQLException {
-		jdbc = new JDBCUtil("adtmgr", "adtmgr", ConfigManager.properties.getProperty("orafip"),
-				ConfigManager.properties.getProperty("oraport"), ConfigManager.properties.getProperty("sid"));
-		String thread = "select max(thread#) as  maxthread from v$log";
-		jdbc.getConnection();
-		Map<String,String>  threadmap = jdbc.executeQueryNormal(thread);
-		maxthread=threadmap.get("maxthread");
-		jdbc.closeDB();
-		if (maxthread.equals("")) {
-			maxthread="1";
-		}
-	}
 
 	/**
 	 * GD 刷新归档
@@ -55,38 +51,43 @@ public class Agent {
 	 * @param model
 	 * @throws IOException
 	 * @throws SQLException
+	 * @throws InterruptedException
 	 */
-	public void runGD(String jgxtlb, String model) throws IOException, SQLException {
-		try {
-			num = ConfigManager.properties.get("num").toString();
-		} catch (Exception e) {
+	public void runGD(String jgxtlb, String model) throws IOException, SQLException, InterruptedException {
+		jdbc.getConnection();
+		String archivetime = "select archivetime from acs where jgxtlb='" + jgxtlb + "'";
+		Map<String, String> archivetimemap = jdbc.executeQueryNormal(archivetime);
+		jdbc.closeDB();
+		if (!archivetimemap.isEmpty()) {
+			num = archivetimemap.get("archivetime");
 		}
-		if (num.equals("")) {
-			jdbc.getConnection();
-			String archivetime = "select archivetime from acs where jgxtlb='" + jgxtlb + "'";
-			Map<String, String> archivetimemap = jdbc.executeQueryNormal(archivetime);
-			jdbc.closeDB();
-			if (!archivetimemap.isEmpty()) {
-				num=archivetimemap.get("archivetime");
+		if (num.equals("") || null == num) {
+			try {
+				num = ConfigManager.properties.get("num").toString();
+			} catch (Exception e) {
+				return ;
 			}
 		}
-		JDBCUtil db = new JDBCUtil(map.get("USERNAME"), map.get("PASSWORD"), map.get("IP"), map.get("PORT"),
-				map.get("SID"));
-		String time = "";
-		if (null == num || num.equals("")) {
-		} else {
-			time = "where" + "	time > '" + num + "'";
-		}
+		gdStatus = JsonToObject.JSONconsvertToMap(JsonToObject.StringconsvertToJSONObject(num));
 		LinkedHashMap<String, String> gdPath = null;
 		for (int i = 1; i <= Integer.valueOf(maxthread); i++) {
+			String time = "";
+			if (!gdStatus.containsKey("thread" + i)) {
+			} else {
+				time = "where" + "	time >= '" + gdStatus.get("thread" + i) + "'";
+			}
+			String redo = "";
 			try {
 				db.getConnection();
-				String redo = "select time,wjm from ( select to_char(next_time,'yyyy/MM/dd hh24:mi:ss') as time, name as wjm from"
-						+ " v$archived_log a where a.name is not null and thread#='"+i+"' order by next_time asc )" + time;
+				redo = "select time,wjm from ( select sequence# as time, name as wjm from"
+						+ " v$archived_log a where a.name is not null and thread#='" + i + "' order by sequence# asc )"
+						+ time;
 				gdPath = db.executeQueryRedoGD(redo);
 			} catch (SQLException e1) {
 				logger.error("查询报错" + e1);
+				logger.error("sql::" + redo);
 				e1.printStackTrace();
+				break;
 			} finally {
 				db.closeDB();
 			}
@@ -103,7 +104,7 @@ public class Agent {
 				}
 				File file = new File(wjm);
 				if (!file.exists()) {
-					continue;
+					break;
 				}
 				ClientDTO filestatus = new ClientDTO();
 				filestatus.setFile_md5("log");
@@ -113,39 +114,48 @@ public class Agent {
 				filestatus.setLength(file.length());
 				filestatus.setClientLogo(jgxtlb);
 				filestatus.setFilestatus("Modified");
-				filestatus.setIp("thread"+i);
+				filestatus.setIp("thread" + i);
 				try {
-					new TransmitClient().connect(new Integer(port), fip, filestatus, "Modified");
-					config.configGetAndSet("num", num);
-					num = entry.getKey();
+					TransmitClient tran = new TransmitClient();
+					tran.connect(new Integer(port), fip, filestatus, "Modified");
+					if (!FileUploadClientHandler.status) {
+						break;
+					} else {
+						gdStatus.put("thread" + i, entry.getKey());
+					}
+					tran = null;
 				} catch (Exception e) {
 					logger.info("GD等待连接-----");
+					break;
 				} finally {
 					if (file.exists()) {
 						file.delete();
 					}
 				}
 			}
+			num = JsonToObject.MapconsvertToJson(gdStatus).toJSONString();
+			config.configGetAndSet("num", num);
+		} // for maxthread
 
-		}//for maxthread
-		
 	}
 
 	public static Map<String, String> redoStatus = new HashMap<>();
+	public static Map<String, Object> gdStatus = new HashMap<>();
+
 	/**
 	 * redo 刷新redo
 	 * 
 	 * @throws IOException
 	 * @throws SQLException
+	 * @throws InterruptedException
 	 */
-	public void runRedo(String jgxtlb, String model) throws IOException, SQLException {
-		JDBCUtil db = new JDBCUtil(map.get("USERNAME"), map.get("PASSWORD"), map.get("IP"), map.get("PORT"),
-				map.get("SID"));
+	public void runRedo(String jgxtlb, String model) throws IOException, SQLException, InterruptedException {
 		List<String> redoPath = null;
 		for (int i = 1; i <= Integer.valueOf(maxthread); i++) {
 			try {
 				db.getConnection();
-				String redo = "select member as wjm from v$logfile where group# in (select group# from v$log where thread# = '"+i+"')";
+				String redo = "select member as wjm from v$logfile where group# in (select group# from v$log where thread# = '"
+						+ i + "')";
 				redoPath = db.executeQueryRedo(redo);
 			} catch (SQLException e1) {
 				e1.printStackTrace();
@@ -161,14 +171,15 @@ public class Agent {
 					wjm = entry;
 				} else if (model.equals("ASM")) {
 					// ASM转换文件系统
-					asmToNFS(entry, userdir + entry.substring(entry.lastIndexOf(FilePathName.FileSepeartor), entry.length())
-							+ "_" + i1);
-					wjm = userdir + entry.substring(entry.lastIndexOf(FilePathName.FileSepeartor), entry.length()) + "_"
-							+ i1;
+					asmToNFS(entry,
+							userdir + entry.substring(entry.lastIndexOf(FilePathName.FileSepeartor) + 1, entry.length())
+									+ "_" + i1);
+					wjm = userdir + entry.substring(entry.lastIndexOf(FilePathName.FileSepeartor) + 1, entry.length())
+							+ "_" + i1;
 				}
 				File file = new File(wjm);
 				if (!file.exists()) {
-					continue;
+					break;
 				}
 				FileInputStream fis = new FileInputStream(wjm);
 				String new_md5 = DigestUtils.md5Hex(fis);
@@ -176,6 +187,10 @@ public class Agent {
 					String old_md5 = redoStatus.get(entry);
 					if (old_md5.equals(new_md5)) {
 						fis.close();
+						logger.error(wjm + "文件名md5相同");
+						if (file.exists()) {
+							file.delete();
+						}
 						continue;
 					} else {
 						redoStatus.put(entry, new_md5);
@@ -193,14 +208,25 @@ public class Agent {
 				filestatus.setLength(file.length());
 				filestatus.setClientLogo(jgxtlb);
 				filestatus.setFilestatus("Modified");
-				filestatus.setIp("thread"+i);
+				filestatus.setIp("thread" + i);
 				try {
-					new TransmitClient().connect(new Integer(port), fip, filestatus, "Modified");
+					logger.error("当前thread：" + i + "   当前redo文件名" + wjm);
+					TransmitClient tran = new TransmitClient();
+					tran.connect(new Integer(port), fip, filestatus, "Modified");
+					if (!FileUploadClientHandler.status) {
+						break;
+					}
+					tran = null;
 				} catch (Exception e) {
 					logger.info("REDO等待连接-----");
+					break;
+				}
+				if (file.exists()) {
+					file.delete();
 				}
 			}
-		}// for maxthread
+		} // for maxthread
+
 		jdbc.getConnection();
 		String stoptime = "select stoptime from acs where jgxtlb='" + jgxtlb + "'";
 		Map<String, String> stoptimemap = jdbc.executeQueryNormal(stoptime);
@@ -214,14 +240,15 @@ public class Agent {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-//		jdbc.getConnection();
-//		String isRerun = "select rerun from acs where jgxtlb='" + jgxtlb + "'";
-//		Map<String, String> isRerunmap = jdbc.executeQueryNormal(isRerun);
-//		jdbc.closeDB();
-//		if (isRerunmap.get("rerun").equals("1")) {
-//			//重启Agent，调用脚本
-//			
-//		}
+		// jdbc.getConnection();
+		// String isRerun = "select rerun from acs where jgxtlb='" + jgxtlb +
+		// "'";
+		// Map<String, String> isRerunmap = jdbc.executeQueryNormal(isRerun);
+		// jdbc.closeDB();
+		// if (isRerunmap.get("rerun").equals("1")) {
+		// //重启Agent，调用脚本
+		//
+		// }
 	}
 
 	/**
@@ -232,26 +259,19 @@ public class Agent {
 	 * @throws IOException
 	 */
 	public void asmToNFS(String oldwjm, String dir) throws IOException {
-		String cmd = "asmcmd -p cp " + oldwjm + "  " + dir;
+		String cmd = "su - grid  asmcmd -p cp " + oldwjm + "  " + dir;
+		logger.error(cmd);
 		Process proc = null;
 		try {
 			proc = Runtime.getRuntime().exec(cmd);
 			proc.waitFor();
 			int data = 0;
-			BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(proc.getInputStream()));
-            String line = null;
-            while ((line = bufferedReader.readLine()) != null) {
-                //System.out.println(line);
-            }
-            bufferedReader.close();
 			InputStream isInput = proc.getInputStream();
 			InputStream errInput = proc.getErrorStream();
 			while ((data = isInput.read()) != -1) {
-				System.out.print((byte) data);
 			}
 			data = 0;
 			while ((data = errInput.read()) != -1) {
-				System.out.print((byte) data);
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -272,20 +292,20 @@ public class Agent {
 		}
 	}
 
-	/**
-	 * 重启
-	 * @throws IOException 
-	 */
-	public void resumAgent() throws IOException{
-		String cmd = "/bin/sh " + FilePathName.ROOT+"resum.sh";
-		Process proc = null;
-		try {
-			proc = Runtime.getRuntime().exec(cmd);
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-	}
+	// /**
+	// * 重启
+	// * @throws IOException
+	// */
+	// public void resumAgent() throws IOException{
+	// String cmd = "/bin/sh " + FilePathName.ROOT+"resum.sh";
+	// Process proc = null;
+	// try {
+	// proc = Runtime.getRuntime().exec(cmd);
+	// } catch (Exception e) {
+	// // TODO Auto-generated catch block
+	// e.printStackTrace();
+	// }
+	// }
 	public void close(Closeable c) {
 		if (c != null) {
 			try {
@@ -300,8 +320,19 @@ public class Agent {
 		return map;
 	}
 
-	public void setRedo(Map<String, String> redo) {
+	public void setRedo(Map<String, String> redo) throws SQLException {
 		this.map = redo;
+		jdbc = new JDBCUtil("adtmgr", "adtmgr", ConfigManager.properties.getProperty("orafip"),
+				ConfigManager.properties.getProperty("oraport"), ConfigManager.properties.getProperty("sid"));
+		db = new JDBCUtil(map.get("USERNAME"), map.get("PASSWORD"), map.get("IP"), map.get("PORT"), map.get("SID"));
+		db.getConnection();
+		String thread = "select max(thread#) as  maxthread from v$log";
+		Map<String, String> threadmap = db.executeQueryNormal(thread);
+		db.closeDB();
+		maxthread = threadmap.get("maxthread");
+		if (maxthread.equals("")) {
+			maxthread = "1";
+		}
 	}
 
 	public boolean isStatus() {

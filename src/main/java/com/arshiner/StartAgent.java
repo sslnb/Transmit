@@ -47,7 +47,7 @@ public class StartAgent implements CommandLineRunner, Ordered {
 	@Async
 	@Override
 	public void run(String... args) {
-//		new TransmitServer().start();
+		// new TransmitServer().start();
 		peizhi = ConfigManager.properties.get("peizhi").toString();
 		model = ConfigManager.properties.get("model").toString();
 		fip = ConfigManager.properties.getProperty("fip");
@@ -58,20 +58,7 @@ public class StartAgent implements CommandLineRunner, Ordered {
 		if (peizhi.equals("")) {
 			return;
 		}
-		ThreadPool threadPool = new ThreadPool(2); // 创建一个此表剩余可连接的线程数目工作线程的线程池。
-		TimerTask timerTask = new TimerTask() {
-			@Override
-			public void run() {
-				try {
-					new HeartClient().connect(9091, ConfigManager.properties.getProperty("fip"));
-				} catch (Exception e) {
-					e.printStackTrace();
-					logger.info("等待heartserver连接");
-				}
-			}
-		};
-		Timer timer = new Timer();
-		timer.schedule(timerTask, 10, 5000);
+		ThreadPool threadPool = new ThreadPool(3); // 创建一个此表剩余可连接的线程数目工作线程的线程池。
 		// 任务一
 		threadPool.execute(new Runnable() {
 
@@ -81,31 +68,58 @@ public class StartAgent implements CommandLineRunner, Ordered {
 				run1();
 			}
 		});
+		// 任务三
+		threadPool.execute(new Runnable() {
+
+			@Override
+			public void run() {
+				while (true) {
+					try {
+						HeartClient heart = new HeartClient();
+						heart.connect(9091, ConfigManager.properties.getProperty("fip"));
+						heart = null;
+					} catch (Exception e) {
+						logger.info("发送心跳失败！");
+						try {
+							Thread.sleep(6000);
+						} catch (InterruptedException e1) {
+							// TODO Auto-generated catch block
+							e1.printStackTrace();
+						}
+					}
+					try {
+						Thread.sleep(6000);
+					} catch (InterruptedException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+				}
+			}
+		});
 
 		// 任务2刷session
 		threadPool.execute(new Runnable() {
 			@Override
 			public void run() {
+				boolean flag = true;
 				while (true) {
 					Map<String, Object> jm = flashpeizhi();
-					JDBCUtil jdbc = new JDBCUtil("adtmgr", "adtmgr",
-							ConfigManager.properties.getProperty("orafip"), oraport, sid);
+					JDBCUtil jdbc = new JDBCUtil("adtmgr", "adtmgr", ConfigManager.properties.getProperty("orafip"),
+							oraport, sid);
 					try {
 						for (Iterator<Entry<String, Object>> it = jm.entrySet().iterator(); it.hasNext();) {
 							Entry<String, Object> entry = it.next();
 							String selectdb = "select * from dbconpro where jgxtlb='" + entry.getKey() + "'";
-							try {
-								jdbc.getConnection();
-							} catch (SQLException e1) {
-								logger.info("连接失败");
-								continue;
+							flag = jdbc.getConnection();
+							if (flag==false) {
+								continue ;
 							}
 							Map<String, String> map = jdbc.executeQuery(selectdb);
 							flashsession(map, entry.getKey());
 						}
 					} catch (SQLException e) {
 						e.printStackTrace();
-					}finally {
+					} finally {
 						jdbc.closeDB();
 					}
 					try {
@@ -116,7 +130,7 @@ public class StartAgent implements CommandLineRunner, Ordered {
 					}
 				}
 			}
-			
+
 		});
 		threadPool.waitFinish(); // 等待所有任务执行完毕
 		threadPool.closePool(); // 关闭线程池
@@ -133,8 +147,7 @@ public class StartAgent implements CommandLineRunner, Ordered {
 	public void flashsession(Map<String, String> map, String jgxtlb) {
 		JDBCUtil db = new JDBCUtil(map.get("USERNAME"), map.get("PASSWORD"), map.get("IP"), map.get("PORT"),
 				map.get("SID"));
-		JDBCUtil jdbc = new JDBCUtil("adtmgr", "adtmgr", ConfigManager.properties.getProperty("orafip"), oraport,
-				sid);
+		JDBCUtil jdbc = new JDBCUtil("adtmgr", "adtmgr", ConfigManager.properties.getProperty("orafip"), oraport, sid);
 		map = null;
 		String sql = "select * from (select to_char(sample_time,'yyyy/mm/dd hh24:mi:ss') t, session_id sid, session_serial# serial, user_id as user#, program, machine"
 				+ " from dba_hist_active_sess_history where user_id>0 " + "union "
@@ -142,8 +155,8 @@ public class StartAgent implements CommandLineRunner, Ordered {
 				+ " from v$session where user# > 0 " + "union "
 				+ "select to_char(sample_time,'yyyy/mm/dd hh24:mi:ss') t, session_id sid, session_serial# serial, user_id, module, machine"
 				+ " from v$active_session_history  where user_id>0" + " order by t desc) where rownum<500 ";
-		String sql1 = "select * from ( select to_char(prev_exec_start,'yyyy/mm/dd hh24:mi:ss') t, sid, serial# as serial, user#, program, machine"+
-"from v$session where user# > 0) order by t desc";
+		String sql1 = "select * from ( select to_char(prev_exec_start,'yyyy/mm/dd hh24:mi:ss') t, sid, serial# as serial, user#, program, machine"
+				+ "from v$session where user# > 0) order by t desc";
 		try {
 			jdbc.getConnection();
 			db.getConnection();
@@ -177,8 +190,9 @@ public class StartAgent implements CommandLineRunner, Ordered {
 					}
 				}
 			}
-			//select * from asession 
-			//where to_date(t,'yyyy/mm/dd hh24:mi:ss')< systimestamp -interval'1'day order by t desc
+			// select * from asession
+			// where to_date(t,'yyyy/mm/dd hh24:mi:ss')< systimestamp
+			// -interval'1'day order by t desc
 		} catch (SQLException e) {
 			logger.info(sql);
 			e.printStackTrace();
@@ -196,6 +210,7 @@ public class StartAgent implements CommandLineRunner, Ordered {
 		// 将剩余连接数获取；
 		Map<String, Object> jm = flashpeizhi();
 		ThreadPool threadPool;
+		boolean flag = true;
 		while (true) {
 			if (ConfigManager.properties.get("kip") != null) {
 			} else {
@@ -211,9 +226,8 @@ public class StartAgent implements CommandLineRunner, Ordered {
 			int i = 0;// 线程号
 			JDBCUtil jdbc = new JDBCUtil("adtmgr", "adtmgr", ConfigManager.properties.getProperty("orafip"), oraport,
 					sid);
-			try {
-				jdbc.getConnection();
-			} catch (SQLException e1) {
+			flag =jdbc.getConnection();
+			if (flag==false) {
 				continue;
 			}
 			try {
@@ -231,7 +245,7 @@ public class StartAgent implements CommandLineRunner, Ordered {
 			} finally {
 				jdbc.closeDB();
 			}
-			
+
 			threadPool.waitFinish(); // 等待所有任务执行完毕
 			threadPool.closePool(); // 关闭线程池
 		}
@@ -282,6 +296,9 @@ public class StartAgent implements CommandLineRunner, Ordered {
 				} catch (SQLException e) {
 					// TODO Auto-generated catch block
 					logger.error(e);
+					e.printStackTrace();
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 			}

@@ -1,12 +1,20 @@
 package com.arshiner;
 
-import org.apache.tomcat.jni.File;
 
-import com.arshiner.common.FilePathName;
+import java.util.HashMap;
+import java.util.Map;
+
+import com.arshiner.common.JsonToObject;
 
 public class Test {
 	public static void main(String[] args) {
-		String str ="1"+FilePathName.FileSepeartor+"2"+FilePathName.FileSepeartor;
-		System.out.println(str.indexOf("1"));
+		
+		Map<String, Object> str1 = new HashMap<>();
+		str1.put("thread1", "725378");
+		str1.put("thread2", "538054");
+		System.out.println(JsonToObject.MapconsvertToJson(str1));
+		
+		
+		
 	}
 }
